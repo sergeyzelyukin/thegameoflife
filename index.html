@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        #gridDiv {
+            display: grid;
+            gap: 1px;
+        }
+        .cell {
+            width: 10px;
+            height: 10px;
+            background-color: lightgoldenrodyellow;
+            border: 1px solid #999;
+        }
+        .cell.on {
+            background: green;
+        }
+    </style></head>
+<body>
+    Select template: 
+    <select id="gridTemplateSelect">
+        <option value="custom">Custom</option>
+        <option value="Blinker">Blinker</option>
+        <option value="Glider">Glider</option>
+        <option value="LWSS">LWSS</option>
+        <option value="Pulsar">Pulsar</option>
+    </select> 
+    or set grid dimensions (rows/cols): 
+    <input type="number" id="gridDimensionsRows" value="50" min="1" max="100"> x 
+    <input type="number" id="gridDimensionsCols" value="50" min="1" max="100"> 
+    <button id="setGridSizeButton">Apply</button><br>
+
+    <button id="resetGridButton">Reset Grid</button><button id="zeroizeGridButton">Zeroize Grid</button>
+    <button id="startGameButton">Start The Game Of Life</button><button id="stopGameButton">Stop The Game Of Life</button>
+
+    <div id="gridDiv"></div>
+    status: <span id="gameStatusSpan">Idle</span>
+
+    <script>
+        var gridTemplates = {
+            "custom": {rows: 50, columns: 50, table: new Array(50).fill(0).map(() => new Array(50).fill(0))},
+            "Blinker": {
+                rows: 50, 
+                columns: 50, 
+                table: centerArray(
+                    [
+                        [1, 1, 1],
+                    ], 50, 50)
+            },
+            "Glider": {
+                rows: 50, 
+                columns: 50, 
+                table: centerArray(
+                    [
+                        [0, 1, 0],
+                        [0, 0, 1],
+                        [1, 1, 1],
+                    ], 50, 50)
+            },
+            "LWSS": {
+                rows: 50, 
+                columns: 50, 
+                table: centerArray(
+                    [
+                        [0, 1, 0, 0, 1],
+                        [1, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 1],
+                        [1, 1, 1, 1, 0]
+                    ], 50, 50)
+            },
+            "Pulsar": {
+                rows: 50, 
+                columns: 50, 
+                table: centerArray(
+                    [
+                        [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                    ], 50, 50)
+            }
+        };
+
+        var intervalId;
+
+        var gridDimensionsCols;
+        var gridDimensionsRows;
+
+        var gridTable;
+
+        var gridDiv = document.getElementById("gridDiv");
+
+        document.getElementById("gridTemplateSelect").onchange = function() {
+            stopTheGameOfLife();
+
+            var template = gridTemplates[this.value];
+            gridDimensionsCols = template.columns;
+            gridDimensionsRows = template.rows;
+            gridTable = template.table;
+
+            document.getElementById("gridDimensionsCols").value = gridDimensionsCols;
+            document.getElementById("gridDimensionsRows").value = gridDimensionsRows;
+
+            createGridDiv();
+        }        
+
+        document.getElementById("setGridSizeButton").onclick = function() {
+            stopTheGameOfLife();
+
+            gridDimensionsCols = parseInt(document.getElementById("gridDimensionsCols").value);
+            gridDimensionsRows = parseInt(document.getElementById("gridDimensionsRows").value);
+
+            gridTable = new Array(gridDimensionsRows).fill(0).map(() => new Array(gridDimensionsCols).fill(0));
+
+            createGridDiv();
+        }
+
+        document.getElementById("zeroizeGridButton").onclick = function() {
+            stopTheGameOfLife();
+
+            for(i = 0; i < gridTable.length; i++) {
+                for(j = 0; j < gridTable[i].length; j++) {
+                    gridTable[i][j] = 0;
+
+                    gridDiv.children[i * gridDimensionsCols + j].classList.remove("on");
+                }
+            }
+        }
+
+        document.getElementById("resetGridButton").onclick = function() {
+            stopTheGameOfLife();
+
+            var gridTemplateSelect = document.getElementById("gridTemplateSelect");
+            gridTemplateSelect.onchange();
+        }
+
+        document.getElementById("startGameButton").onclick = function() {
+            startTheGameOfLife();
+        }
+
+        document.getElementById("stopGameButton").onclick = function() {
+            stopTheGameOfLife();
+        }
+
+        var gridTemplateSelect = document.getElementById("gridTemplateSelect");
+        gridTemplateSelect.value = "custom";
+        gridTemplateSelect.onchange();
+
+        function startTheGameOfLife() {
+            stopTheGameOfLife();
+            if(!isGridEmpty(gridTable)) {
+                intervalId = setInterval(updateGrid, 100);
+            } else {
+                alert("Grid is empty!")
+            } 
+        }
+
+        function stopTheGameOfLife() {
+            if(intervalId) {
+                document.getElementById("gameStatusSpan").textContent = "Idle";
+                clearInterval(intervalId);
+            }
+        }
+
+        function createGridDiv() {
+            gridDiv.innerHTML = '';
+            gridDiv.style.gridTemplateColumns = `repeat(${gridDimensionsCols}, 10px)`;
+            gridDiv.style.gridTemplateRows = `repeat(${gridDimensionsRows}, 10px)`;
+
+            for (var i = 0; i < gridDimensionsRows; i++) {
+                for (var j = 0; j < gridDimensionsCols; j++) {
+                    var cellDiv = document.createElement("div");
+
+                    cellDiv.classList.add("cell");
+                    if (gridTable[i][j] === 1) {
+                        cellDiv.classList.add("on");
+                    }
+
+                    cellDiv.dataset.row = i;
+                    cellDiv.dataset.column = j;
+
+                    cellDiv.onclick = toggleCell;
+
+                    gridDiv.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function centerArray(templateArray, rows, cols) {
+            let newArray = new Array(rows).fill(0).map(() => new Array(cols).fill(0));
+
+            if (templateArray.length > rows || (templateArray[0] && templateArray[0].length > cols)) {
+                alert('Template array is too large');
+                return newArray;
+            }
+
+            if (templateArray.length === 0) {
+                alert('Template array is empty');
+                return newArray;
+            }
+
+            let rowStart = Math.floor((rows - templateArray.length) / 2);
+            let colStart = Math.floor((cols - templateArray[0].length) / 2);
+
+            for (let i = 0; i < templateArray.length; i++) {
+                for (let j = 0; j < templateArray[i].length; j++) {
+                    newArray[rowStart + i][colStart + j] = templateArray[i][j];
+                }
+            }
+
+            return newArray;
+        }
+        
+        function isGridEmpty(grid) {
+            for(let i = 0; i < grid.length; i++) {
+                for(let j = 0; j < grid[i].length; j++) {
+                    if(grid[i][j] === 1) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function toggleCell(e) {
+            var row = e.target.dataset.row;
+            var column = e.target.dataset.column;
+            gridTable[row][column] = gridTable[row][column] === 0 ? 1 : 0;
+            e.target.classList.toggle("on");
+        }
+
+        function areGridsEqual(grid1, grid2) {
+            if (grid1.length !== grid2.length || grid1[0].length !== grid2[0].length) {
+                return false;
+            }
+
+            for (let i = 0; i < grid1.length; i++) {
+                for (let j = 0; j < grid1[i].length; j++) {
+                    if (grid1[i][j] !== grid2[i][j]) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        function updateGrid() {
+            document.getElementById("gameStatusSpan").textContent = "Running";
+            var newGridTable = new Array(gridDimensionsRows).fill(0).map(() => new Array(gridDimensionsCols).fill(0));
+
+            for (var i = 0; i < gridDimensionsRows; i++) {
+                for (var j = 0; j < gridDimensionsCols; j++) {
+                    var aliveNeighbors = 0;
+                    for (var di = -1; di <= 1; di++) {
+                        for (var dj = -1; dj <= 1; dj++) {
+                            if (di == 0 && dj == 0) {
+                                continue;
+                            }
+                            var ni = i + di;
+                            var nj = j + dj;
+                            if (ni >= 0 && ni < gridDimensionsRows && nj >= 0 && nj < gridDimensionsCols && gridTable[ni][nj]) {
+                                aliveNeighbors++;
+                            }
+                        }
+                    }
+
+                    if (gridTable[i][j] && (aliveNeighbors == 2 || aliveNeighbors == 3)) {
+                        newGridTable[i][j] = 1;
+                    } else if (!gridTable[i][j] && aliveNeighbors == 3) {
+                        newGridTable[i][j] = 1;
+                    }
+                }
+            }
+
+            if (areGridsEqual(gridTable, newGridTable)) {
+                stopTheGameOfLife()
+            }
+
+            gridTable = newGridTable;
+            for (var i = 0; i < gridDimensionsRows; i++) {
+                for (var j = 0; j < gridDimensionsCols; j++) {
+                    var cellDiv = gridDiv.children[i * gridDimensionsCols + j];
+                    if (gridTable[i][j]) {
+                        cellDiv.classList.add("on");
+                    } else {
+                        cellDiv.classList.remove("on");
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
